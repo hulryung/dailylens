@@ -88,6 +88,19 @@ def get_all_summary_dates() -> list[str]:
     return [row["date"] for row in rows]
 
 
+def get_recent_captures(limit: int = 5) -> list[dict]:
+    """Get the most recent N captures (excluding skipped ones)."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT timestamp, app_name, category, description FROM captures "
+        "WHERE category != '스킵됨' AND description != '' "
+        "ORDER BY timestamp DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in reversed(rows)]
+
+
 def get_capture_dates() -> list[str]:
     conn = get_db()
     rows = conn.execute(

@@ -6,9 +6,17 @@ ANALYZE_PROMPTS = {
 
 스크린샷 경로: {screenshot_path}
 {app_info}
-
+{context_section}
 반드시 아래 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요:
 {{"description": "사용자가 하고 있는 활동을 1-2문장으로 설명", "category": "코딩/문서작성/이메일/웹브라우징/미팅/디자인/커뮤니케이션/기타 중 하나"}}""",
+        "context_header": """
+아래는 이전 캡처 기록입니다. 이 맥락을 참고하여 현재 활동이 이전 작업의 연속인지, 새로운 작업으로 전환했는지 판단해주세요.
+이전 작업의 연속이라면 "~를 계속 진행 중" 등으로, 전환했다면 "~에서 ~로 전환" 등으로 표현해주세요.
+
+### 이전 캡처 기록
+{context_entries}
+""",
+        "context_entry": "[{time}] {app} — {description}",
         "app_info": "현재 활성 앱: {app_name}",
         "categories": "코딩/문서작성/이메일/웹브라우징/미팅/디자인/커뮤니케이션/기타",
         "fallback_category": "기타",
@@ -21,9 +29,17 @@ ANALYZE_PROMPTS = {
 
 Screenshot path: {screenshot_path}
 {app_info}
-
+{context_section}
 Respond ONLY in the JSON format below. Do not include any other text:
 {{"description": "Describe the user's activity in 1-2 sentences", "category": "one of: coding/writing/email/browsing/meeting/design/communication/other"}}""",
+        "context_header": """
+Below are recent capture records. Use this context to determine whether the current activity is a continuation of previous work or a switch to something new.
+If continuing, say "Continuing to..." or similar. If switching, say "Switched from ... to ..." or similar.
+
+### Recent capture history
+{context_entries}
+""",
+        "context_entry": "[{time}] {app} — {description}",
         "app_info": "Currently active app: {app_name}",
         "categories": "coding/writing/email/browsing/meeting/design/communication/other",
         "fallback_category": "other",
@@ -36,9 +52,17 @@ Respond ONLY in the JSON format below. Do not include any other text:
 
 スクリーンショットパス: {screenshot_path}
 {app_info}
-
+{context_section}
 必ず以下のJSON形式のみで回答してください。他のテキストは含めないでください:
 {{"description": "ユーザーの活動を1-2文で説明", "category": "コーディング/文書作成/メール/ウェブ閲覧/ミーティング/デザイン/コミュニケーション/その他 のいずれか"}}""",
+        "context_header": """
+以下は最近のキャプチャ記録です。このコンテキストを参考に、現在の活動が前の作業の継続か、新しい作業への切り替えかを判断してください。
+継続の場合は「～を継続中」、切り替えの場合は「～から～に切り替え」などと表現してください。
+
+### 最近のキャプチャ記録
+{context_entries}
+""",
+        "context_entry": "[{time}] {app} — {description}",
         "app_info": "現在アクティブなアプリ: {app_name}",
         "categories": "コーディング/文書作成/メール/ウェブ閲覧/ミーティング/デザイン/コミュニケーション/その他",
         "fallback_category": "その他",
@@ -51,9 +75,17 @@ Respond ONLY in the JSON format below. Do not include any other text:
 
 截图路径: {screenshot_path}
 {app_info}
-
+{context_section}
 请仅以下面的JSON格式回答，不要包含其他文字:
 {{"description": "用1-2句话描述用户的活动", "category": "编程/文档/邮件/浏览网页/会议/设计/沟通/其他 之一"}}""",
+        "context_header": """
+以下是最近的截图记录。请参考此上下文，判断当前活动是之前工作的延续还是切换到了新任务。
+如果是延续，请说"继续..."；如果是切换，请说"从...切换到..."。
+
+### 最近截图记录
+{context_entries}
+""",
+        "context_entry": "[{time}] {app} — {description}",
         "app_info": "当前活跃应用: {app_name}",
         "categories": "编程/文档/邮件/浏览网页/会议/设计/沟通/其他",
         "fallback_category": "其他",

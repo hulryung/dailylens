@@ -18,6 +18,7 @@ On demand:
 
 - **Periodic screenshot capture** — configurable interval (default: 60s)
 - **AI-powered analysis** — Claude describes what you're doing in each screenshot
+- **Context-aware continuity** — remembers recent activity to understand work flow (e.g., "continuing code review" vs "switched from email to coding")
 - **Daily summary** — timeline, task breakdown, category stats, notable patterns
 - **Web dashboard** — dark-themed UI with timeline view and summary panel
 - **Screenshot zoom** — click thumbnails to expand, navigate with arrow keys
@@ -70,6 +71,7 @@ All settings are optional. Configure via `.env` file or environment variables:
 | `MAX_SCREENSHOT_WIDTH` | `1280` | Resize screenshots to this width |
 | `CLAUDE_MODEL` | `sonnet` | Claude model to use |
 | `LANGUAGE` | `ko` | Output language: `ko`, `en`, `ja`, `zh` |
+| `CONTEXT_SIZE` | `5` | Number of recent captures for context (0 to disable) |
 | `DUPLICATE_THRESHOLD` | `95` | Skip if similarity >= this % (0-100) |
 | `SKIP_APPS` | `1Password,Keychain Access,...` | Comma-separated apps to skip |
 | `SKIP_TITLE_KEYWORDS` | `password,secret,...` | Window title keywords to skip |

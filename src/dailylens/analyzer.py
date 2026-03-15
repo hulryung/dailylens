@@ -9,12 +9,25 @@ from dailylens.prompts import get_analyze_prompt
 logger = logging.getLogger("dailylens")
 
 
-def analyze_screenshot(screenshot_path: Path, app_name: str = "") -> dict:
-    """Analyze a screenshot using claude CLI."""
+def analyze_screenshot(screenshot_path: Path, app_name: str = "",
+                       context: list[dict] | None = None) -> dict:
+    """Analyze a screenshot using claude CLI.
+
+    Args:
+        screenshot_path: Path to the screenshot image.
+        app_name: Currently active application name.
+        context: List of recent captures for continuity awareness.
+                 Each dict has: timestamp, app_name, description.
+    """
     t = get_analyze_prompt(LANGUAGE)
 
     app_info = t["app_info"].format(app_name=app_name) if app_name else ""
-    prompt = t["prompt"].format(screenshot_path=screenshot_path, app_info=app_info)
+    context_section = _build_context_section(t, context)
+    prompt = t["prompt"].format(
+        screenshot_path=screenshot_path,
+        app_info=app_info,
+        context_section=context_section,
+    )
 
     try:
         result = subprocess.run(
@@ -42,6 +55,24 @@ def analyze_screenshot(screenshot_path: Path, app_name: str = "") -> dict:
     except FileNotFoundError:
         logger.error("claude CLI not found. Is Claude Code installed?")
         return {"description": t["error_not_found"], "category": t["fallback_category"]}
+
+
+def _build_context_section(t: dict, context: list[dict] | None) -> str:
+    """Build the context section string from recent captures."""
+    if not context:
+        return ""
+
+    entries = []
+    for c in context:
+        ts = c.get("timestamp", "")
+        time_str = ts.split("T")[-1][:5] if "T" in ts else ts[11:16] if len(ts) > 16 else ts
+        entries.append(t["context_entry"].format(
+            time=time_str,
+            app=c.get("app_name", ""),
+            description=c.get("description", ""),
+        ))
+
+    return t["context_header"].format(context_entries="\n".join(entries))
 
 
 def _parse_response(output: str, fallback_category: str) -> dict:

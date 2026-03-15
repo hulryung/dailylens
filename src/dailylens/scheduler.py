@@ -5,8 +5,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from dailylens.capture import take_screenshot, get_active_app_name, should_skip_capture, is_duplicate_screenshot
 from dailylens.analyzer import analyze_screenshot
-from dailylens.storage import save_capture
-from dailylens.config import CAPTURE_INTERVAL_SECONDS
+from dailylens.storage import save_capture, get_recent_captures
+from dailylens.config import CAPTURE_INTERVAL_SECONDS, CONTEXT_SIZE
 
 logger = logging.getLogger("dailylens")
 
@@ -43,7 +43,8 @@ def capture_and_analyze() -> None:
             screenshot_path.unlink(missing_ok=True)
             return
 
-        result = analyze_screenshot(screenshot_path, app_name=app_name)
+        context = get_recent_captures(limit=CONTEXT_SIZE)
+        result = analyze_screenshot(screenshot_path, app_name=app_name, context=context)
 
         timestamp = datetime.now().isoformat()
         save_capture(
