@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DailyLens</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        header {
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+        }
+        header h1 span { color: #6c9fff; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .controls select, .controls button {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .controls button {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+            font-weight: 500;
+        }
+        .controls button:hover { background: #1d4ed8; }
+        .controls button:disabled { opacity: 0.5; cursor: wait; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .panel {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a2a;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .panel-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .timeline-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #222;
+        }
+        .timeline-item:last-child { border-bottom: none; }
+        .timeline-time {
+            flex-shrink: 0;
+            font-size: 13px;
+            color: #888;
+            width: 50px;
+            padding-top: 2px;
+        }
+        .timeline-content { flex: 1; }
+        .timeline-app {
+            font-size: 12px;
+            color: #6c9fff;
+            margin-bottom: 4px;
+        }
+        .timeline-desc {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #ccc;
+        }
+        .timeline-thumb {
+            width: 80px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
+            flex-shrink: 0;
+            border: 1px solid #333;
+        }
+        .timeline-thumb:hover { border-color: #6c9fff; }
+        .category-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #2a2a2a;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        .summary-content {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #ccc;
+        }
+        .summary-content h1, .summary-content h2, .summary-content h3 {
+            color: #fff;
+            margin: 16px 0 8px;
+        }
+        .summary-content h2 { font-size: 16px; }
+        .summary-content h3 { font-size: 14px; }
+        .summary-content ul { padding-left: 20px; }
+        .summary-content li { margin: 4px 0; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .status {
+            font-size: 13px;
+            color: #888;
+        }
+        .status.active { color: #4ade80; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal img {
+            max-width: 90vw;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Daily<span>Lens</span></h1>
+        <span class="status active" id="status">Monitoring</span>
+    </header>
+
+    <div class="container">
+        <div class="controls">
+            <select id="dateSelect">
+                {% for d in dates %}
+                <option value="{{ d }}" {% if d == today %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+                {% if not dates %}
+                <option value="{{ today }}">{{ today }}</option>
+                {% endif %}
+            </select>
+            <button id="summaryBtn" onclick="loadSummary()">일일 요약 생성</button>
+            <button onclick="loadSummary(true)">요약 재생성</button>
+        </div>
+
+        <div class="grid">
+            <div class="panel">
+                <div class="panel-header">타임라인</div>
+                <div class="panel-body" id="timeline">
+                    <div class="empty-state">캡처 데이터를 불러오는 중...</div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">일일 요약</div>
+                <div class="panel-body summary-content" id="summary">
+                    <div class="empty-state">날짜를 선택하고 "일일 요약 생성" 버튼을 눌러주세요</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal" onclick="this.classList.remove('show')">
+        <img id="modalImg" src="" alt="Screenshot">
+    </div>
+
+    <script>
+        const dateSelect = document.getElementById('dateSelect');
+        const timeline = document.getElementById('timeline');
+        const summary = document.getElementById('summary');
+
+        dateSelect.addEventListener('change', loadCaptures);
+
+        async function loadCaptures() {
+            const date = dateSelect.value;
+            timeline.innerHTML = '<div class="empty-state">불러오는 중...</div>';
+
+            try {
+                const res = await fetch(`/api/captures/${date}`);
+                const data = await res.json();
+
+                if (!data.captures.length) {
+                    timeline.innerHTML = '<div class="empty-state">이 날짜에 캡처된 데이터가 없습니다</div>';
+                    return;
+                }
+
+                timeline.innerHTML = data.captures.map(c => {
+                    const time = c.timestamp.includes('T')
+                        ? c.timestamp.split('T')[1].substring(0, 5)
+                        : c.timestamp.substring(11, 16);
+                    return `
+                        <div class="timeline-item">
+                            <div class="timeline-time">${time}</div>
+                            <div class="timeline-content">
+                                <div class="timeline-app">${c.app_name || ''}</div>
+                                <div class="timeline-desc">${escapeHtml(c.description || '')}</div>
+                                ${c.category ? `<span class="category-badge">${c.category}</span>` : ''}
+                            </div>
+                            ${c.screenshot_url ? `<img class="timeline-thumb" src="${c.screenshot_url}" onclick="showModal('${c.screenshot_url}')" loading="lazy">` : ''}
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                timeline.innerHTML = '<div class="empty-state">데이터 로딩 실패</div>';
+            }
+        }
+
+        async function loadSummary(regenerate = false) {
+            const date = dateSelect.value;
+            const btn = document.getElementById('summaryBtn');
+            btn.disabled = true;
+            summary.innerHTML = '<div class="empty-state">AI가 요약을 생성하는 중...</div>';
+
+            try {
+                const url = `/api/summary/${date}${regenerate ? '?regenerate=true' : ''}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                summary.innerHTML = markdownToHtml(data.summary);
+            } catch (e) {
+                summary.innerHTML = '<div class="empty-state">요약 생성 실패</div>';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function showModal(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function markdownToHtml(md) {
+            return md
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/^\- (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // Load captures on page load
+        loadCaptures();
+    </script>
+</body>
+</html>

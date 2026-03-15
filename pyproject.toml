@@ -1,0 +1,24 @@
+[project]
+name = "dailylens"
+version = "0.1.0"
+description = "Take periodic screenshots and summarize your daily work with AI"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.42.0",
+    "apscheduler>=3.10.4",
+    "fastapi>=0.115.0",
+    "jinja2>=3.1.4",
+    "pillow>=11.0.0",
+    "python-dotenv>=1.0.1",
+    "uvicorn>=0.32.0",
+]
+
+[project.scripts]
+dailylens = "dailylens.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dailylens"]
