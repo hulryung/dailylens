@@ -20,11 +20,16 @@ def generate_daily_summary(target_date: date) -> str:
     records = []
     for c in captures:
         time_str = c["timestamp"].split("T")[-1][:5] if "T" in c["timestamp"] else c["timestamp"][11:16]
+        ocr_text = c.get("ocr_text", "")
+        # Truncate OCR for summary to keep prompt manageable
+        if len(ocr_text) > 500:
+            ocr_text = ocr_text[:500] + "..."
         records.append(t["record_format"].format(
             time=time_str,
             app=c.get("app_name", ""),
             category=c.get("category", ""),
             description=c.get("description", ""),
+            ocr_text=ocr_text if ocr_text else "(없음)",
         ))
 
     captures_text = "\n---\n".join(records)

@@ -10,23 +10,28 @@ logger = logging.getLogger("dailylens")
 
 
 def analyze_screenshot(screenshot_path: Path, app_name: str = "",
-                       context: list[dict] | None = None) -> dict:
+                       context: list[dict] | None = None,
+                       ocr_text: str = "") -> dict:
     """Analyze a screenshot using claude CLI.
 
     Args:
         screenshot_path: Path to the screenshot image.
         app_name: Currently active application name.
         context: List of recent captures for continuity awareness.
-                 Each dict has: timestamp, app_name, description.
+        ocr_text: Text extracted from the screenshot via OCR.
     """
     t = get_analyze_prompt(LANGUAGE)
 
     app_info = t["app_info"].format(app_name=app_name) if app_name else ""
     context_section = _build_context_section(t, context)
+    ocr_section = ""
+    if ocr_text:
+        ocr_section = t["ocr_header"].format(ocr_text=ocr_text)
     prompt = t["prompt"].format(
         screenshot_path=screenshot_path,
         app_info=app_info,
         context_section=context_section,
+        ocr_section=ocr_section,
     )
 
     try:

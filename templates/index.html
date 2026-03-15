@@ -249,6 +249,60 @@
             z-index: 101;
         }
         .modal-close:hover { color: #fff; }
+
+        /* Search */
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        .search-bar input::placeholder { color: #555; }
+        .search-bar button {
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .search-bar button:hover { background: #252525; }
+        .search-results {
+            display: none;
+            margin-bottom: 24px;
+        }
+        .search-results.show { display: block; }
+        .search-results .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .search-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .search-close:hover { color: #fff; }
+        .highlight { background: #4a3a00; color: #ffd700; padding: 0 2px; border-radius: 2px; }
+        .ocr-preview {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            max-height: 40px;
+            overflow: hidden;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -258,6 +312,19 @@
     </header>
 
     <div class="container">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Search OCR text and descriptions..." onkeydown="if(event.key==='Enter')doSearch()">
+            <button onclick="doSearch()">Search</button>
+        </div>
+
+        <div class="search-results panel" id="searchResults">
+            <div class="panel-header">
+                <span id="searchTitle">Search Results</span>
+                <button class="search-close" onclick="closeSearch()">&times;</button>
+            </div>
+            <div class="panel-body" id="searchBody" style="max-height:40vh"></div>
+        </div>
+
         <div class="controls">
             <select id="dateSelect">
                 {% for d in dates %}
@@ -561,6 +628,63 @@
 
         function parsePipeLine(line) {
             return line.split('|').slice(1, -1).map(s => s.trim());
+        }
+
+        // -- Search --
+        async function doSearch() {
+            const q = document.getElementById('searchInput').value.trim();
+            if (!q) return;
+
+            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            const el = document.getElementById('searchResults');
+            const body = document.getElementById('searchBody');
+
+            document.getElementById('searchTitle').textContent =
+                `Search: "${q}" (${data.count} results)`;
+
+            if (!data.results.length) {
+                body.innerHTML = '<div class="empty-state">No results found</div>';
+            } else {
+                body.innerHTML = data.results.map(c => {
+                    const time = c.timestamp.includes('T')
+                        ? c.timestamp.substring(0, 16).replace('T', ' ')
+                        : c.timestamp.substring(0, 16);
+                    const desc = highlightText(escapeHtml(c.description || ''), q);
+                    const ocr = c.ocr_text
+                        ? highlightText(escapeHtml(c.ocr_text.substring(0, 150)), q)
+                        : '';
+                    return `
+                        <div class="timeline-item">
+                            <div class="timeline-time" style="width:110px">${time}</div>
+                            <div class="timeline-content">
+                                <div class="timeline-app">${escapeHtml(c.app_name || '')}</div>
+                                <div class="timeline-desc">${desc}</div>
+                                ${ocr ? `<div class="ocr-preview">${ocr}</div>` : ''}
+                                ${c.category ? `<span class="category-badge">${escapeHtml(c.category)}</span>` : ''}
+                            </div>
+                            ${c.screenshot_url ? `<img class="timeline-thumb" src="${c.screenshot_url}" onclick="showModal('${c.screenshot_url}')" loading="lazy">` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+            el.classList.add('show');
+        }
+
+        function closeSearch() {
+            document.getElementById('searchResults').classList.remove('show');
+        }
+
+        function highlightText(text, query) {
+            if (!query) return text;
+            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(re, '<span class="highlight">$1</span>');
+        }
+
+        function showModal(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('modal').classList.add('show');
+            currentModalIndex = -1;
         }
 
         // Load captures on page load

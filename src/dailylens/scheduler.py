@@ -5,6 +5,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from dailylens.capture import take_screenshot, get_active_app_name, should_skip_capture, is_duplicate_screenshot
 from dailylens.analyzer import analyze_screenshot
+from dailylens.ocr import extract_text
 from dailylens.storage import save_capture, get_recent_captures
 from dailylens.config import CAPTURE_INTERVAL_SECONDS, CONTEXT_SIZE
 
@@ -43,8 +44,15 @@ def capture_and_analyze() -> None:
             screenshot_path.unlink(missing_ok=True)
             return
 
+        # Extract text via OCR
+        ocr_text = extract_text(screenshot_path)
+        if ocr_text:
+            logger.info(f"OCR extracted {len(ocr_text)} chars")
+
         context = get_recent_captures(limit=CONTEXT_SIZE)
-        result = analyze_screenshot(screenshot_path, app_name=app_name, context=context)
+        result = analyze_screenshot(
+            screenshot_path, app_name=app_name, context=context, ocr_text=ocr_text,
+        )
 
         timestamp = datetime.now().isoformat()
         save_capture(
@@ -53,6 +61,7 @@ def capture_and_analyze() -> None:
             description=result["description"],
             app_name=app_name,
             category=result["category"],
+            ocr_text=ocr_text,
         )
         logger.info(f"Capture analyzed: {result['category']} - {app_name}")
 

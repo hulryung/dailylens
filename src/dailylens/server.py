@@ -11,7 +11,7 @@ from dailylens.storage import (
     get_captures_for_date,
     get_daily_summary,
     get_capture_dates,
-    get_all_summary_dates,
+    search_captures,
 )
 from dailylens.summarizer import generate_daily_summary
 
@@ -39,8 +39,11 @@ async def api_captures(target_date: str):
     d = date.fromisoformat(target_date)
     captures = get_captures_for_date(d)
     for c in captures:
-        path = Path(c["screenshot_path"])
-        c["screenshot_url"] = f"/screenshots/{path.parent.name}/{path.name}"
+        if c["screenshot_path"]:
+            path = Path(c["screenshot_path"])
+            c["screenshot_url"] = f"/screenshots/{path.parent.name}/{path.name}"
+        else:
+            c["screenshot_url"] = ""
     return {"date": target_date, "captures": captures}
 
 
@@ -51,6 +54,18 @@ async def api_summary(target_date: str, regenerate: bool = False):
     if summary is None or regenerate:
         summary = generate_daily_summary(d)
     return {"date": target_date, "summary": summary}
+
+
+@app.get("/api/search")
+async def api_search(q: str, limit: int = 50):
+    results = search_captures(q, limit=limit)
+    for c in results:
+        if c["screenshot_path"]:
+            path = Path(c["screenshot_path"])
+            c["screenshot_url"] = f"/screenshots/{path.parent.name}/{path.name}"
+        else:
+            c["screenshot_url"] = ""
+    return {"query": q, "count": len(results), "results": results}
 
 
 @app.get("/screenshots/{date_dir}/{filename}")

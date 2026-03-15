@@ -20,7 +20,8 @@ def init_db() -> None:
             screenshot_path TEXT NOT NULL,
             description TEXT,
             app_name TEXT,
-            category TEXT
+            category TEXT,
+            ocr_text TEXT DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS daily_summaries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,16 +32,22 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_captures_timestamp ON captures(timestamp);
         CREATE INDEX IF NOT EXISTS idx_summaries_date ON daily_summaries(date);
     """)
+    # Add ocr_text column if missing (migration for existing DBs)
+    try:
+        conn.execute("ALTER TABLE captures ADD COLUMN ocr_text TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass  # column already exists
     conn.close()
 
 
 def save_capture(timestamp: str, screenshot_path: str, description: str,
-                 app_name: str = "", category: str = "") -> int:
+                 app_name: str = "", category: str = "", ocr_text: str = "") -> int:
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO captures (timestamp, screenshot_path, description, app_name, category) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (timestamp, screenshot_path, description, app_name, category),
+        "INSERT INTO captures (timestamp, screenshot_path, description, app_name, category, ocr_text) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (timestamp, screenshot_path, description, app_name, category, ocr_text),
     )
     conn.commit()
     capture_id = cursor.lastrowid
@@ -99,6 +106,20 @@ def get_recent_captures(limit: int = 5) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(row) for row in reversed(rows)]
+
+
+def search_captures(query: str, limit: int = 50) -> list[dict]:
+    """Full-text search across OCR text and descriptions."""
+    conn = get_db()
+    pattern = f"%{query}%"
+    rows = conn.execute(
+        "SELECT * FROM captures "
+        "WHERE (ocr_text LIKE ? OR description LIKE ?) AND category != '스킵됨' "
+        "ORDER BY timestamp DESC LIMIT ?",
+        (pattern, pattern, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 
 def get_capture_dates() -> list[str]:
