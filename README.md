@@ -76,6 +76,24 @@ All settings are optional. Configure via `.env` file or environment variables:
 | `SCREENSHOT_DIR` | `screenshots` | Screenshot storage directory |
 | `DB_PATH` | `dailylens.db` | SQLite database path |
 
+## Multi-language support
+
+DailyLens supports multiple languages for screenshot analysis and daily summaries. Set the `LANGUAGE` variable in your `.env` file:
+
+```bash
+# .env
+LANGUAGE=en
+```
+
+| Code | Language | Analysis example | Categories |
+|------|----------|-----------------|------------|
+| `ko` | Korean (default) | "터미널에서 코드를 편집하고 있다" | 코딩, 문서작성, 이메일, 웹브라우징, 미팅, 디자인, 커뮤니케이션, 기타 |
+| `en` | English | "Editing code in the terminal" | coding, writing, email, browsing, meeting, design, communication, other |
+| `ja` | Japanese | "ターミナルでコードを編集中" | コーディング, 文書作成, メール, ウェブ閲覧, ミーティング, デザイン, コミュニケーション, その他 |
+| `zh` | Chinese | "在终端编辑代码" | 编程, 文档, 邮件, 浏览网页, 会议, 设计, 沟通, 其他 |
+
+To add a new language, add entries to the `ANALYZE_PROMPTS` and `SUMMARY_PROMPTS` dictionaries in `src/dailylens/prompts.py`.
+
 ## Privacy
 
 - **100% local** — all data stays on your machine
