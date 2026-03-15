@@ -94,13 +94,35 @@ LANGUAGE=en
 
 To add a new language, add entries to the `ANALYZE_PROMPTS` and `SUMMARY_PROMPTS` dictionaries in `src/dailylens/prompts.py`.
 
-## Privacy
+## Privacy & Data Security
 
-- **100% local** — all data stays on your machine
-- **No API keys** — uses Claude Code CLI with your existing subscription
-- **Sensitive screen filtering** — automatically skips password managers, lock screens, and configurable apps/keywords
-- **Duplicate detection** — doesn't waste resources on unchanged screens
-- Screenshots stored in local `screenshots/` directory, analysis in local SQLite
+**DailyLens never sends your data to any external server.** All screenshots and analysis results are stored exclusively on your local machine.
+
+### Where your data lives
+
+| Data | Location | Leaves your machine? |
+|------|----------|---------------------|
+| Screenshots | `screenshots/` directory | No |
+| Analysis results | `dailylens.db` (SQLite) | No |
+| Daily summaries | `dailylens.db` (SQLite) | No |
+| Configuration | `.env` file | No |
+
+### How AI analysis works
+
+DailyLens uses the locally installed `claude` CLI (Claude Code) to analyze screenshots. The `claude` CLI runs on your machine as part of your existing Claude Code subscription — there are no API keys, no third-party services, and no external endpoints involved. The analysis prompt and screenshot are processed through the Claude Code CLI pipe mode (`claude -p`), which operates within your authenticated session.
+
+### No network calls from DailyLens
+
+- DailyLens itself makes **zero network requests**. It does not contain any HTTP client code, upload endpoints, or telemetry.
+- The only process that communicates externally is the `claude` CLI, which is managed by Anthropic's Claude Code and subject to its own [privacy policy](https://www.anthropic.com/privacy).
+- The web dashboard runs on `localhost` only and is not exposed to the internet.
+
+### Built-in protections
+
+- **Sensitive screen filtering** — automatically skips password managers (1Password, Keychain Access), lock screens, and windows with configurable keywords (password, secret, credential, etc.)
+- **Duplicate detection** — skips unchanged screens to minimize unnecessary data storage
+- **Local-only web UI** — dashboard binds to `localhost`, inaccessible from other machines
+- **`.gitignore` configured** — screenshots, database, and `.env` files are excluded from version control by default
 
 ## Tech stack
 
