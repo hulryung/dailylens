@@ -12,6 +12,7 @@ CAPTURE_INTERVAL_SECONDS = int(os.getenv("CAPTURE_INTERVAL_SECONDS", "60"))
 MAX_SCREENSHOT_WIDTH = int(os.getenv("MAX_SCREENSHOT_WIDTH", "1280"))
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "sonnet")
 DUPLICATE_THRESHOLD = int(os.getenv("DUPLICATE_THRESHOLD", "95"))
+LANGUAGE = os.getenv("LANGUAGE", "ko")
 
 # Apps/windows to skip capturing (sensitive content)
 SKIP_APPS = [

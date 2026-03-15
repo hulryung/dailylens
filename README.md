@@ -69,6 +69,7 @@ All settings are optional. Configure via `.env` file or environment variables:
 | `CAPTURE_INTERVAL_SECONDS` | `60` | Seconds between captures |
 | `MAX_SCREENSHOT_WIDTH` | `1280` | Resize screenshots to this width |
 | `CLAUDE_MODEL` | `sonnet` | Claude model to use |
+| `LANGUAGE` | `ko` | Output language: `ko`, `en`, `ja`, `zh` |
 | `DUPLICATE_THRESHOLD` | `95` | Skip if similarity >= this % (0-100) |
 | `SKIP_APPS` | `1Password,Keychain Access,...` | Comma-separated apps to skip |
 | `SKIP_TITLE_KEYWORDS` | `password,secret,...` | Window title keywords to skip |
