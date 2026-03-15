@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Take periodic screenshots and summarize your daily work with AI"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic>=0.42.0",
     "apscheduler>=3.10.4",
     "fastapi>=0.115.0",
     "jinja2>=3.1.4",

@@ -86,6 +86,7 @@
             border-bottom: 1px solid #222;
         }
         .timeline-item:last-child { border-bottom: none; }
+        .timeline-item.skipped { opacity: 0.5; }
         .timeline-time {
             flex-shrink: 0;
             font-size: 13px;
@@ -112,8 +113,12 @@
             cursor: pointer;
             flex-shrink: 0;
             border: 1px solid #333;
+            transition: border-color 0.2s, transform 0.2s;
         }
-        .timeline-thumb:hover { border-color: #6c9fff; }
+        .timeline-thumb:hover {
+            border-color: #6c9fff;
+            transform: scale(1.05);
+        }
         .category-badge {
             display: inline-block;
             font-size: 11px;
@@ -123,6 +128,12 @@
             color: #aaa;
             margin-top: 4px;
         }
+        .category-badge.skipped {
+            background: #3a2020;
+            color: #f87171;
+        }
+
+        /* Summary markdown styles */
         .summary-content {
             font-size: 14px;
             line-height: 1.8;
@@ -132,10 +143,49 @@
             color: #fff;
             margin: 16px 0 8px;
         }
+        .summary-content h1 { font-size: 18px; }
         .summary-content h2 { font-size: 16px; }
         .summary-content h3 { font-size: 14px; }
-        .summary-content ul { padding-left: 20px; }
+        .summary-content ul, .summary-content ol { padding-left: 20px; margin: 8px 0; }
         .summary-content li { margin: 4px 0; }
+        .summary-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+        .summary-content th, .summary-content td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .summary-content th {
+            background: #252525;
+            color: #fff;
+            font-weight: 600;
+        }
+        .summary-content tr:nth-child(even) { background: #1e1e1e; }
+        .summary-content blockquote {
+            border-left: 3px solid #6c9fff;
+            padding: 8px 16px;
+            margin: 12px 0;
+            background: #1e1e1e;
+            border-radius: 0 6px 6px 0;
+            color: #aaa;
+        }
+        .summary-content code {
+            background: #252525;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .summary-content hr {
+            border: none;
+            border-top: 1px solid #333;
+            margin: 16px 0;
+        }
+        .summary-content p { margin: 8px 0; }
+        .summary-content strong { color: #fff; }
         .empty-state {
             text-align: center;
             padding: 40px;
@@ -146,22 +196,59 @@
             color: #888;
         }
         .status.active { color: #4ade80; }
-        .modal {
+
+        /* Modal for screenshot zoom */
+        .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             z-index: 100;
-            cursor: pointer;
+            cursor: zoom-out;
             align-items: center;
             justify-content: center;
+            flex-direction: column;
+            gap: 12px;
         }
-        .modal.show { display: flex; }
-        .modal img {
+        .modal-overlay.show { display: flex; }
+        .modal-overlay img {
             max-width: 90vw;
-            max-height: 90vh;
+            max-height: 85vh;
             border-radius: 8px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
         }
+        .modal-info {
+            color: #888;
+            font-size: 13px;
+        }
+        .modal-nav {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 28px;
+            padding: 16px 12px;
+            cursor: pointer;
+            border-radius: 8px;
+            z-index: 101;
+        }
+        .modal-nav:hover { background: rgba(255,255,255,0.2); }
+        .modal-nav.prev { left: 16px; }
+        .modal-nav.next { right: 16px; }
+        .modal-close {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 101;
+        }
+        .modal-close:hover { color: #fff; }
     </style>
 </head>
 <body>
@@ -200,14 +287,22 @@
         </div>
     </div>
 
-    <div class="modal" id="modal" onclick="this.classList.remove('show')">
+    <!-- Screenshot zoom modal -->
+    <div class="modal-overlay" id="modal">
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+        <button class="modal-nav prev" onclick="navigateModal(-1)">&lsaquo;</button>
+        <button class="modal-nav next" onclick="navigateModal(1)">&rsaquo;</button>
         <img id="modalImg" src="" alt="Screenshot">
+        <div class="modal-info" id="modalInfo"></div>
     </div>
 
     <script>
         const dateSelect = document.getElementById('dateSelect');
         const timeline = document.getElementById('timeline');
         const summary = document.getElementById('summary');
+
+        let currentCaptures = [];
+        let currentModalIndex = -1;
 
         dateSelect.addEventListener('change', loadCaptures);
 
@@ -218,25 +313,27 @@
             try {
                 const res = await fetch(`/api/captures/${date}`);
                 const data = await res.json();
+                currentCaptures = data.captures;
 
                 if (!data.captures.length) {
                     timeline.innerHTML = '<div class="empty-state">이 날짜에 캡처된 데이터가 없습니다</div>';
                     return;
                 }
 
-                timeline.innerHTML = data.captures.map(c => {
+                timeline.innerHTML = data.captures.map((c, i) => {
                     const time = c.timestamp.includes('T')
                         ? c.timestamp.split('T')[1].substring(0, 5)
                         : c.timestamp.substring(11, 16);
+                    const isSkipped = c.category === '스킵됨';
                     return `
-                        <div class="timeline-item">
+                        <div class="timeline-item${isSkipped ? ' skipped' : ''}">
                             <div class="timeline-time">${time}</div>
                             <div class="timeline-content">
-                                <div class="timeline-app">${c.app_name || ''}</div>
+                                <div class="timeline-app">${escapeHtml(c.app_name || '')}</div>
                                 <div class="timeline-desc">${escapeHtml(c.description || '')}</div>
-                                ${c.category ? `<span class="category-badge">${c.category}</span>` : ''}
+                                ${c.category ? `<span class="category-badge${isSkipped ? ' skipped' : ''}">${escapeHtml(c.category)}</span>` : ''}
                             </div>
-                            ${c.screenshot_url ? `<img class="timeline-thumb" src="${c.screenshot_url}" onclick="showModal('${c.screenshot_url}')" loading="lazy">` : ''}
+                            ${c.screenshot_url && !isSkipped ? `<img class="timeline-thumb" src="${c.screenshot_url}" onclick="openModal(${i})" loading="lazy">` : ''}
                         </div>
                     `;
                 }).join('');
@@ -263,11 +360,56 @@
             }
         }
 
-        function showModal(src) {
-            document.getElementById('modalImg').src = src;
+        // -- Modal (screenshot zoom with navigation) --
+        function openModal(index) {
+            currentModalIndex = index;
+            updateModal();
             document.getElementById('modal').classList.add('show');
         }
 
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+            currentModalIndex = -1;
+        }
+
+        function navigateModal(dir) {
+            event.stopPropagation();
+            const filtered = currentCaptures
+                .map((c, i) => ({ ...c, _idx: i }))
+                .filter(c => c.screenshot_url && c.category !== '스킵됨');
+
+            const curPos = filtered.findIndex(c => c._idx === currentModalIndex);
+            let newPos = curPos + dir;
+            if (newPos < 0) newPos = filtered.length - 1;
+            if (newPos >= filtered.length) newPos = 0;
+
+            currentModalIndex = filtered[newPos]._idx;
+            updateModal();
+        }
+
+        function updateModal() {
+            const c = currentCaptures[currentModalIndex];
+            if (!c) return;
+            document.getElementById('modalImg').src = c.screenshot_url;
+            const time = c.timestamp.includes('T')
+                ? c.timestamp.split('T')[1].substring(0, 8)
+                : c.timestamp.substring(11, 19);
+            document.getElementById('modalInfo').textContent =
+                `${time} - ${c.app_name || ''} (${c.category || ''})`;
+        }
+
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (currentModalIndex === -1) return;
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'ArrowLeft') navigateModal(-1);
+            if (e.key === 'ArrowRight') navigateModal(1);
+        });
+
+        // -- Markdown rendering --
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -275,15 +417,150 @@
         }
 
         function markdownToHtml(md) {
-            return md
-                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+            const lines = md.split('\n');
+            const html = [];
+            let inList = false;
+            let inOrderedList = false;
+            let inTable = false;
+            let inBlockquote = false;
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+
+                // Horizontal rule
+                if (/^---+$/.test(line.trim())) {
+                    closeOpenTags();
+                    html.push('<hr>');
+                    continue;
+                }
+
+                // Table detection: line with pipes
+                if (line.includes('|') && line.trim().startsWith('|')) {
+                    // Check if next line is separator
+                    const nextLine = lines[i + 1] || '';
+                    const isSeparator = /^\|[\s\-:|]+\|$/.test(nextLine.trim());
+
+                    if (!inTable && isSeparator) {
+                        closeOpenTags();
+                        inTable = true;
+                        html.push('<table>');
+                        // Parse header
+                        const headers = parsePipeLine(line);
+                        html.push('<thead><tr>');
+                        headers.forEach(h => html.push(`<th>${inlineMarkdown(h)}</th>`));
+                        html.push('</tr></thead><tbody>');
+                        i++; // skip separator line
+                        continue;
+                    } else if (inTable) {
+                        const cells = parsePipeLine(line);
+                        html.push('<tr>');
+                        cells.forEach(c => html.push(`<td>${inlineMarkdown(c)}</td>`));
+                        html.push('</tr>');
+                        // Check if table ends
+                        const nextContent = lines[i + 1] || '';
+                        if (!nextContent.trim().startsWith('|')) {
+                            inTable = false;
+                            html.push('</tbody></table>');
+                        }
+                        continue;
+                    }
+                }
+
+                // Close table if still open
+                if (inTable && !line.trim().startsWith('|')) {
+                    inTable = false;
+                    html.push('</tbody></table>');
+                }
+
+                // Blockquote
+                if (line.trim().startsWith('>')) {
+                    if (!inBlockquote) {
+                        closeOpenTags();
+                        inBlockquote = true;
+                        html.push('<blockquote>');
+                    }
+                    html.push(inlineMarkdown(line.replace(/^>\s*/, '')) + '<br>');
+                    continue;
+                } else if (inBlockquote) {
+                    inBlockquote = false;
+                    html.push('</blockquote>');
+                }
+
+                // Headings
+                if (line.startsWith('### ')) {
+                    closeOpenTags();
+                    html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);
+                    continue;
+                }
+                if (line.startsWith('## ')) {
+                    closeOpenTags();
+                    html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`);
+                    continue;
+                }
+                if (line.startsWith('# ')) {
+                    closeOpenTags();
+                    html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`);
+                    continue;
+                }
+
+                // Unordered list
+                if (/^[\-\*] /.test(line.trim())) {
+                    if (!inList) {
+                        closeOpenTags();
+                        inList = true;
+                        html.push('<ul>');
+                    }
+                    html.push(`<li>${inlineMarkdown(line.replace(/^\s*[\-\*] /, ''))}</li>`);
+                    continue;
+                } else if (inList) {
+                    inList = false;
+                    html.push('</ul>');
+                }
+
+                // Ordered list
+                if (/^\d+\.\s/.test(line.trim())) {
+                    if (!inOrderedList) {
+                        closeOpenTags();
+                        inOrderedList = true;
+                        html.push('<ol>');
+                    }
+                    html.push(`<li>${inlineMarkdown(line.replace(/^\s*\d+\.\s/, ''))}</li>`);
+                    continue;
+                } else if (inOrderedList) {
+                    inOrderedList = false;
+                    html.push('</ol>');
+                }
+
+                // Empty line
+                if (line.trim() === '') {
+                    closeOpenTags();
+                    continue;
+                }
+
+                // Paragraph
+                html.push(`<p>${inlineMarkdown(line)}</p>`);
+            }
+
+            closeOpenTags();
+            return html.join('\n');
+
+            function closeOpenTags() {
+                if (inList) { html.push('</ul>'); inList = false; }
+                if (inOrderedList) { html.push('</ol>'); inOrderedList = false; }
+                if (inTable) { html.push('</tbody></table>'); inTable = false; }
+                if (inBlockquote) { html.push('</blockquote>'); inBlockquote = false; }
+            }
+        }
+
+        function inlineMarkdown(text) {
+            return text
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/^\- (.+)$/gm, '<li>$1</li>')
-                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/`(.+?)`/g, '<code>$1</code>');
+        }
+
+        function parsePipeLine(line) {
+            return line.split('|').slice(1, -1).map(s => s.trim());
         }
 
         // Load captures on page load

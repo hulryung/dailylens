@@ -1,61 +1,69 @@
-import base64
+import json
+import logging
+import subprocess
 from pathlib import Path
 
-import anthropic
+from dailylens.config import CLAUDE_MODEL
 
-from dailylens.config import ANTHROPIC_API_KEY
+logger = logging.getLogger("dailylens")
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+ANALYZE_PROMPT = """아래 경로의 스크린샷 파일을 읽고, 사용자가 현재 무엇을 하고 있는지 분석해주세요.
 
-ANALYZE_PROMPT = """이 스크린샷을 보고, 사용자가 현재 무엇을 하고 있는지 간결하게 한국어로 설명해주세요.
+스크린샷 경로: {screenshot_path}
+{app_info}
 
-다음 형식으로 응답해주세요:
-- 활동: (어떤 작업을 하고 있는지 1-2문장)
-- 카테고리: (코딩, 문서작성, 이메일, 웹브라우징, 미팅, 디자인, 기타 중 하나)
-
-불필요한 설명 없이 간결하게 답변해주세요."""
+반드시 아래 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요:
+{{"description": "사용자가 하고 있는 활동을 1-2문장으로 설명", "category": "코딩/문서작성/이메일/웹브라우징/미팅/디자인/커뮤니케이션/기타 중 하나"}}"""
 
 
 def analyze_screenshot(screenshot_path: Path, app_name: str = "") -> dict:
-    """Analyze a screenshot using Claude Vision API."""
-    image_data = base64.standard_b64encode(screenshot_path.read_bytes()).decode("utf-8")
+    """Analyze a screenshot using claude CLI."""
+    app_info = f"현재 활성 앱: {app_name}" if app_name else ""
+    prompt = ANALYZE_PROMPT.format(screenshot_path=screenshot_path, app_info=app_info)
 
-    media_type = "image/png"
-    if screenshot_path.suffix.lower() in (".jpg", ".jpeg"):
-        media_type = "image/jpeg"
+    try:
+        result = subprocess.run(
+            [
+                "claude", "-p", prompt,
+                "--model", CLAUDE_MODEL,
+                "--allowedTools", "Read",
+                "--output-format", "text",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
 
-    user_content = []
-    user_content.append({
-        "type": "image",
-        "source": {
-            "type": "base64",
-            "media_type": media_type,
-            "data": image_data,
-        },
-    })
+        if result.returncode != 0:
+            logger.error(f"claude CLI failed: {result.stderr}")
+            return {"description": "분석 실패", "category": "기타"}
 
-    prompt = ANALYZE_PROMPT
-    if app_name:
-        prompt += f"\n\n현재 활성 앱: {app_name}"
+        output = result.stdout.strip()
+        return _parse_response(output)
 
-    user_content.append({"type": "text", "text": prompt})
+    except subprocess.TimeoutExpired:
+        logger.error("claude CLI timed out")
+        return {"description": "분석 시간 초과", "category": "기타"}
+    except FileNotFoundError:
+        logger.error("claude CLI not found. Is Claude Code installed?")
+        return {"description": "claude CLI를 찾을 수 없습니다", "category": "기타"}
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=300,
-        messages=[{"role": "user", "content": user_content}],
-    )
 
-    text = response.content[0].text
-    description = text
-    category = ""
+def _parse_response(output: str) -> dict:
+    """Parse JSON response from claude CLI output."""
+    # Try to extract JSON from the output
+    try:
+        # Look for JSON object in the output
+        start = output.find("{")
+        end = output.rfind("}") + 1
+        if start != -1 and end > start:
+            data = json.loads(output[start:end])
+            return {
+                "description": data.get("description", output),
+                "category": data.get("category", "기타"),
+            }
+    except json.JSONDecodeError:
+        pass
 
-    for line in text.split("\n"):
-        line = line.strip()
-        if line.startswith("- 카테고리:"):
-            category = line.replace("- 카테고리:", "").strip()
-
-    return {
-        "description": description,
-        "category": category,
-    }
+    # Fallback: use raw output as description
+    return {"description": output, "category": "기타"}

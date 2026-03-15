@@ -1,11 +1,11 @@
+import logging
+import subprocess
 from datetime import date
 
-import anthropic
-
-from dailylens.config import ANTHROPIC_API_KEY
+from dailylens.config import CLAUDE_MODEL
 from dailylens.storage import get_captures_for_date, save_daily_summary
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+logger = logging.getLogger("dailylens")
 
 SUMMARY_PROMPT = """아래는 사용자의 하루 동안의 화면 캡처 분석 기록입니다. 이를 바탕으로 하루 업무 내용을 정리해주세요.
 
@@ -18,7 +18,7 @@ SUMMARY_PROMPT = """아래는 사용자의 하루 동안의 화면 캡처 분석
 한국어로 작성해주세요. 마크다운 형식으로 깔끔하게 정리해주세요.
 
 ## 캡처 기록
-"""
+{captures_text}"""
 
 
 def generate_daily_summary(target_date: date) -> str:
@@ -37,16 +37,30 @@ def generate_daily_summary(target_date: date) -> str:
         records.append(f"[{time_str}] 앱: {app} | 카테고리: {cat}\n{desc}")
 
     captures_text = "\n---\n".join(records)
+    prompt = SUMMARY_PROMPT.format(captures_text=captures_text)
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2000,
-        messages=[{
-            "role": "user",
-            "content": SUMMARY_PROMPT + captures_text,
-        }],
-    )
+    try:
+        result = subprocess.run(
+            [
+                "claude", "-p", prompt,
+                "--model", CLAUDE_MODEL,
+                "--output-format", "text",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
 
-    summary = response.content[0].text
+        if result.returncode != 0:
+            logger.error(f"claude CLI failed: {result.stderr}")
+            return "요약 생성에 실패했습니다."
+
+        summary = result.stdout.strip()
+
+    except subprocess.TimeoutExpired:
+        summary = "요약 생성 시간이 초과되었습니다."
+    except FileNotFoundError:
+        summary = "claude CLI를 찾을 수 없습니다. Claude Code가 설치되어 있는지 확인해주세요."
+
     save_daily_summary(target_date, summary)
     return summary

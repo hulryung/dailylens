@@ -3,7 +3,7 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from dailylens.capture import take_screenshot, get_active_app_name
+from dailylens.capture import take_screenshot, get_active_app_name, should_skip_capture, is_duplicate_screenshot
 from dailylens.analyzer import analyze_screenshot
 from dailylens.storage import save_capture
 from dailylens.config import CAPTURE_INTERVAL_SECONDS
@@ -14,6 +14,20 @@ logger = logging.getLogger("dailylens")
 def capture_and_analyze() -> None:
     """Take a screenshot, analyze it, and save the result."""
     try:
+        # Check if capture should be skipped
+        skip, reason = should_skip_capture()
+        if skip:
+            logger.info(f"Capture skipped: {reason}")
+            timestamp = datetime.now().isoformat()
+            save_capture(
+                timestamp=timestamp,
+                screenshot_path="",
+                description=reason,
+                app_name="",
+                category="스킵됨",
+            )
+            return
+
         app_name = get_active_app_name()
         screenshot_path = take_screenshot()
 
@@ -22,6 +36,12 @@ def capture_and_analyze() -> None:
             return
 
         logger.info(f"Screenshot saved: {screenshot_path}")
+
+        # Skip if screenshot is same as previous
+        if is_duplicate_screenshot(screenshot_path):
+            logger.info("Capture skipped: duplicate screenshot")
+            screenshot_path.unlink(missing_ok=True)
+            return
 
         result = analyze_screenshot(screenshot_path, app_name=app_name)
 
